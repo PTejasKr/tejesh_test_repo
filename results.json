@@ -1,0 +1,135 @@
+{
+  "run_timestamp": "2026-02-20T10:20:18.819147+00:00",
+  "repo_url": "C:\\Users\\savy\\AppData\\Local\\Temp\\velo_stream_p22x98nx",
+  "raw_branch_name": "punyatester punyabhai",
+  "branch_name": "PUNYATESTER_PUNYABHAI_AI_Fix",
+  "total_time_taken": "1m 6s",
+  "total_time_seconds": 66.77,
+  "test_files_discovered": [
+    "C:\\Users\\savy\\AppData\\Local\\Temp\\velo_stream_p22x98nx\\practice-repo-main\\tests\\test_calculator.py",
+    "C:\\Users\\savy\\AppData\\Local\\Temp\\velo_stream_p22x98nx\\practice-repo-main\\tests\\test_greeter.py"
+  ],
+  "total_failures_detected": 5,
+  "total_fixes_applied": 3,
+  "bug_reports": [
+    "[INDENTATION] error in src/greeter.py line 3 \u2192 Fix: replace tab with 4 spaces for consistent indentation",
+    "[INDENTATION] error in src/greeter.py line 3 \u2192 Fix: replace tab with spaces for consistent indentation",
+    "[INDENTATION] error in practice-repo-main/src/greeter.py line 3 \u2192 Fix: replace tab with 4 spaces for consistent indentation",
+    "[LOGIC] error in src/calculator.py line 10 \u2192 Fix: change addition to multiplication",
+    "[LOGIC] error in src/calculator.py line 8 \u2192 Fix: change addition to multiplication in return"
+  ],
+  "files_fixed": [
+    "src/greeter.py",
+    "practice-repo-main/src/greeter.py",
+    "src/calculator.py"
+  ],
+  "branch_pushed": "PUNYATESTER_PUNYABHAI_AI_Fix",
+  "commit_sha": "9d95156ea69fe65fbde2ed74afabf1780aa3dc0f",
+  "total_commits": 5,
+  "diffs": {
+    "src/calculator.py": {
+      "unified_diff": ""
+    }
+  },
+  "final_ci_passed": false,
+  "final_ci_status": "FAILED",
+  "iterations_used": 5,
+  "max_retries": 5,
+  "ci_timeline": [
+    {
+      "iteration": 1,
+      "status": "FAILED",
+      "timestamp": "2026-02-20T10:19:12.052470+00:00",
+      "failures_in_run": 1,
+      "fixes_in_run": 1,
+      "commits_in_run": 1,
+      "error": null
+    },
+    {
+      "iteration": 2,
+      "status": "FAILED",
+      "timestamp": "2026-02-20T10:19:24.858275+00:00",
+      "failures_in_run": 1,
+      "fixes_in_run": 1,
+      "commits_in_run": 1,
+      "error": null
+    },
+    {
+      "iteration": 3,
+      "status": "FAILED",
+      "timestamp": "2026-02-20T10:19:38.449454+00:00",
+      "failures_in_run": 1,
+      "fixes_in_run": 1,
+      "commits_in_run": 1,
+      "error": null
+    },
+    {
+      "iteration": 4,
+      "status": "FAILED",
+      "timestamp": "2026-02-20T10:19:48.758399+00:00",
+      "failures_in_run": 1,
+      "fixes_in_run": 1,
+      "commits_in_run": 1,
+      "error": null
+    },
+    {
+      "iteration": 5,
+      "status": "FAILED",
+      "timestamp": "2026-02-20T10:20:03.938558+00:00",
+      "failures_in_run": 1,
+      "fixes_in_run": 1,
+      "commits_in_run": 1,
+      "error": null
+    }
+  ],
+  "score": {
+    "base": 100,
+    "speed_bonus": 0,
+    "efficiency_penalty": 0,
+    "final": 0
+  },
+  "error": null,
+  "status": "PARTIAL",
+  "fixes": [
+    {
+      "file": "src/greeter.py",
+      "bug_type": "INDENTATION",
+      "line_number": 3,
+      "commit_message": "[AI-AGENT] Fix: replace tab with 4 spaces for consistent indentation",
+      "status": "fixed",
+      "fix_description": "replace tab with 4 spaces for consistent indentation"
+    },
+    {
+      "file": "src/greeter.py",
+      "bug_type": "INDENTATION",
+      "line_number": 3,
+      "commit_message": "[AI-AGENT] Fix: replace tab with spaces for consistent indentation",
+      "status": "fixed",
+      "fix_description": "replace tab with spaces for consistent indentation"
+    },
+    {
+      "file": "practice-repo-main/src/greeter.py",
+      "bug_type": "INDENTATION",
+      "line_number": 3,
+      "commit_message": "[AI-AGENT] Fix: replace tab with 4 spaces for consistent indentation",
+      "status": "fixed",
+      "fix_description": "replace tab with 4 spaces for consistent indentation"
+    },
+    {
+      "file": "src/calculator.py",
+      "bug_type": "LOGIC",
+      "line_number": 10,
+      "commit_message": "[AI-AGENT] Fix: change addition to multiplication",
+      "status": "fixed",
+      "fix_description": "change addition to multiplication"
+    },
+    {
+      "file": "src/calculator.py",
+      "bug_type": "LOGIC",
+      "line_number": 8,
+      "commit_message": "[AI-AGENT] Fix: change addition to multiplication in return",
+      "status": "fixed",
+      "fix_description": "change addition to multiplication in return"
+    }
+  ]
+}
