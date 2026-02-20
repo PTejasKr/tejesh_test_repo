@@ -1,0 +1,341 @@
+name: Auto-Score
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - master
+
+jobs:
+  evaluate:
+    if: github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Validate branch name
+        id: validate
+        run: |
+          BRANCH="${GITHUB_REF#refs/heads/}"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+          echo "Branch: $BRANCH"
+          
+          # Pattern: Must have at least TEAM_LEADER_AI_Fix (3 parts minimum)
+          # Examples: A_B_AI_Fix, TEAM_NAME_LEADER_NAME_AI_Fix
+          if ! echo "$BRANCH" | grep -qE '^[A-Z][A-Z0-9_]*_[A-Z][A-Z0-9_]*_AI_Fix$'; then
+            echo "❌ Invalid branch name format!"
+            echo ""
+            echo "Expected format: TEAM_NAME_LEADER_NAME_AI_Fix"
+            echo "Your branch: $BRANCH"
+            echo ""
+            echo "Rules:"
+            echo "  • All UPPERCASE letters"
+            echo "  • Use underscores (_) for spaces"
+            echo "  • Format: TEAM_NAME_LEADER_NAME_AI_Fix"
+            echo "  • Must end with: _AI_Fix"
+            echo ""
+            echo "Examples:"
+            echo "  ✓ RIFT_ORGANISERS_SAIYAM_KUMAR_AI_Fix"
+            echo "  ✓ CODE_WARRIORS_JOHN_DOE_AI_Fix"
+            echo "  ✓ TEAM_A_LEADER_B_AI_Fix"
+            echo "  ✗ team_name_leader_AI_Fix (lowercase)"
+            echo "  ✗ TEAM_AI_Fix (missing leader)"
+            exit 1
+          fi
+          
+          # Extract team and leader
+          TEMP="${BRANCH%_AI_Fix}"
+          LEADER="${TEMP##*_}"
+          TEAM="${TEMP%_*}"
+          
+          echo "team=$TEAM" >> $GITHUB_OUTPUT
+          echo "leader=$LEADER" >> $GITHUB_OUTPUT
+          
+          echo "✅ Valid branch name"
+          echo "   Team: $TEAM"
+          echo "   Leader: $LEADER"
+      
+      - name: Check commit prefixes
+        id: commits
+        run: |
+          # Determine base branch
+          if git show-ref --verify --quiet refs/remotes/origin/main; then
+            BASE="origin/main"
+          elif git show-ref --verify --quiet refs/remotes/origin/master; then
+            BASE="origin/master"
+          else
+            BASE="HEAD~1"
+          fi
+          
+          git fetch origin $BASE 2>/dev/null || true
+          
+          # Count commits
+          COUNT=$(git rev-list --count $BASE..HEAD 2>/dev/null || echo "1")
+          echo "count=$COUNT" >> $GITHUB_OUTPUT
+          echo "Commits in branch: $COUNT"
+          
+          # Check commit message prefixes
+          INVALID_COMMITS=$(git log $BASE..HEAD --format="%h %s" 2>/dev/null | grep -v "^\w\+ \[AI-AGENT\]\|\[AUTO-FIX\]" || true)
+          
+          if [ -n "$INVALID_COMMITS" ]; then
+            echo "❌ Found commits without required prefix!"
+            echo ""
+            echo "All commits must start with [AI-AGENT] or [AUTO-FIX]"
+            echo ""
+            echo "Invalid commits:"
+            echo "$INVALID_COMMITS"
+            echo ""
+            echo "Example of valid commit:"
+            echo "  git commit -m '[AI-AGENT] Fix linting errors'"
+            exit 1
+          fi
+          
+          echo "✅ All commits have valid prefixes"
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      
+      - name: Setup Node.js
+        if: hashFiles('**/package.json') != ''
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Run Python tests
+        if: hashFiles('**/requirements.txt') != ''
+        run: |
+          echo "→ Installing Python dependencies..."
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt --quiet
+          fi
+          
+          if [ -f "python-backend/requirements.txt" ]; then
+            cd python-backend
+            pip install -r requirements.txt --quiet
+            cd ..
+          fi
+          
+          echo "→ Running linting..."
+          if [ -f ".flake8" ]; then
+            flake8 src/ || exit 1
+          fi
+          
+          if [ -f ".pylintrc" ]; then
+            pylint src/ --fail-under=8.0 || exit 1
+          fi
+          
+          if [ -f "python-backend/.pylintrc" ]; then
+            cd python-backend
+            pylint src/ --fail-under=8.0 || exit 1
+            cd ..
+          fi
+          
+          echo "→ Running tests..."
+          if [ -d "tests" ]; then
+            pytest tests/ -v || exit 1
+          fi
+          
+          if [ -d "python-backend/tests" ]; then
+            cd python-backend
+            pytest tests/ -v || exit 1
+            cd ..
+          fi
+          
+          echo "✅ Python tests passed"
+      
+      - name: Run JavaScript tests
+        if: hashFiles('**/package.json') != ''
+        run: |
+          if [ -d "javascript-frontend" ]; then
+            echo "→ Installing JavaScript dependencies..."
+            cd javascript-frontend
+            npm install --quiet
+            
+            echo "→ Running linting..."
+            npm run lint || exit 1
+            
+            echo "→ Running tests..."
+            npm test || exit 1
+            
+            cd ..
+            echo "✅ JavaScript tests passed"
+          fi
+      
+      - name: Calculate score
+        id: score
+        run: |
+          COMMITS=${{ steps.commits.outputs.count }}
+          
+          # Get base branch
+          if git show-ref --verify --quiet refs/remotes/origin/main; then
+            BASE="origin/main"
+          elif git show-ref --verify --quiet refs/remotes/origin/master; then
+            BASE="origin/master"
+          else
+            BASE="HEAD~1"
+          fi
+          
+          # Calculate duration
+          FIRST=$(git log $BASE..HEAD --reverse --format=%ct 2>/dev/null | head -1)
+          LAST=$(git log $BASE..HEAD --format=%ct 2>/dev/null | head -1)
+          
+          if [ -z "$FIRST" ] || [ -z "$LAST" ]; then
+            FIRST=$(date +%s)
+            LAST=$(date +%s)
+          fi
+          
+          DURATION=$(( (LAST - FIRST) / 60 ))
+          if [ $DURATION -eq 0 ]; then
+            DURATION=1
+          fi
+          
+          # Calculate score
+          SCORE=100
+          
+          # Speed bonus
+          if [ $DURATION -lt 5 ]; then
+            BONUS=10
+            SCORE=$((SCORE + BONUS))
+            echo "⚡ Speed bonus: +$BONUS points (completed in $DURATION minutes)"
+          fi
+          
+          # Efficiency penalty
+          if [ $COMMITS -gt 20 ]; then
+            PENALTY=$(( (COMMITS - 20) * 2 ))
+            SCORE=$((SCORE - PENALTY))
+            echo "⚠️  Efficiency penalty: -$PENALTY points ($COMMITS commits)"
+          fi
+          
+          # Clamp score
+          if [ $SCORE -lt 0 ]; then
+            SCORE=0
+          fi
+          if [ $SCORE -gt 110 ]; then
+            SCORE=110
+          fi
+          
+          echo "duration=$DURATION" >> $GITHUB_OUTPUT
+          echo "score=$SCORE" >> $GITHUB_OUTPUT
+          
+          echo ""
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "📊 FINAL SCORE: $SCORE/100"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+          echo "   Duration: $DURATION minutes"
+          echo "   Commits: $COMMITS"
+          echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      
+      - name: Update results.md
+        run: |
+          BRANCH="${{ steps.validate.outputs.branch }}"
+          TEAM="${{ steps.validate.outputs.team }}"
+          LEADER="${{ steps.validate.outputs.leader }}"
+          SCORE="${{ steps.score.outputs.score }}"
+          COMMITS="${{ steps.commits.outputs.count }}"
+          DURATION="${{ steps.score.outputs.duration }}"
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M UTC")
+          
+          echo "→ Switching to main branch..."
+          git fetch origin main 2>/dev/null || git fetch origin master 2>/dev/null || true
+          
+          if git show-ref --verify --quiet refs/remotes/origin/main; then
+            git checkout main
+            MAIN_BRANCH="main"
+          elif git show-ref --verify --quiet refs/remotes/origin/master; then
+            git checkout master
+            MAIN_BRANCH="master"
+          else
+            echo "⚠️  No main/master branch found"
+            exit 0
+          fi
+          
+          echo "→ Creating/updating results.md..."
+          
+          # Create results.md if it doesn't exist
+          if [ ! -f "results.md" ]; then
+            cat > results.md << 'RESULTSEOF'
+# Auto-Score Results
+
+| Team Branch | Status | Time | Commits | Score | Timestamp |
+|-------------|--------|------|---------|-------|-----------|
+| _Waiting for submissions..._ | - | - | - | - | - |
+
+**Scoring Rules:**
+- Base: 100 points
+- Speed Bonus: +10 points if completed in < 5 minutes
+- Efficiency Penalty: -2 points per commit over 20
+- Maximum: 110 points
+RESULTSEOF
+          fi
+          
+          # Create new entry
+          ENTRY="| $BRANCH | ✅ PASSED | ${DURATION}m | $COMMITS | **${SCORE}/100** | $TIMESTAMP |"
+          
+          # Remove old entry if exists
+          if grep -q "$BRANCH" results.md; then
+            grep -v "$BRANCH" results.md > results_temp.md
+            mv results_temp.md results.md
+          fi
+          
+          # Add new entry (insert before "Waiting" line)
+          awk -v entry="$ENTRY" '
+            /Waiting for submissions/ { print entry }
+            { print }
+          ' results.md > results_temp.md
+          mv results_temp.md results.md
+          
+          echo "→ Committing results..."
+          git config user.name "Auto-Score Bot"
+          git config user.email "autoscore@hackathon.com"
+          git add results.md
+          
+          if git commit -m "[AUTO-SCORE] $TEAM/$LEADER = $SCORE/100" 2>/dev/null; then
+            echo "→ Pushing to $MAIN_BRANCH..."
+            if git push origin $MAIN_BRANCH 2>/dev/null; then
+              echo "✅ Results updated successfully!"
+            else
+              echo "⚠️  Could not push (branch protection may be enabled)"
+              echo "   Results recorded locally but not pushed"
+            fi
+          else
+            echo "ℹ️  No changes to commit"
+          fi
+      
+      - name: Create summary
+        if: success()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << 'SUMEOF'
+          # 🎉 Evaluation Complete!
+          
+          ## Results
+          
+          | Metric | Value |
+          |--------|-------|
+          | **Team** | ${{ steps.validate.outputs.team }} |
+          | **Leader** | ${{ steps.validate.outputs.leader }} |
+          | **Branch** | ${{ steps.validate.outputs.branch }} |
+          | **Score** | **${{ steps.score.outputs.score }}/100** |
+          | **Duration** | ${{ steps.score.outputs.duration }} minutes |
+          | **Commits** | ${{ steps.commits.outputs.count }} |
+          
+          ## Status
+          
+          ✅ All tests passed  
+          ✅ Branch name validated  
+          ✅ Commit prefixes verified  
+          ✅ Score calculated  
+          ✅ Results recorded  
+          
+          ---
+          
+          *Auto-Score Workflow v2.0*
+          SUMEOF
