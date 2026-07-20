@@ -1,6 +1,6 @@
 # PR #4 Summary
 
-- **Version**: v0.0.3
+- **Version**: v0.0.4
 - **Date**: 2026-07-20
 - **Lines Changed**: +5 / -0
 
